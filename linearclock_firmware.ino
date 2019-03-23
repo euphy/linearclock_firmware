@@ -54,12 +54,23 @@ byte stepSize = 1;
 
 boolean motorsEnabled = false;
 
+/* This is the number of steps to move the indicator from one end to the other. */
+static int stepsPerClockMinuteHand = 2105;
+static int stepsPerClockHourHand = 2105;
+
+float stepsPerMinute = stepsPerClockMinuteHand/60.0;
+float stepsPerHourMinute = stepsPerClockHourHand/(60.0 * 12.0);
+float stepsPerHour = stepsPerClockHourHand/12.0;
+
+int const END_MARGIN = 4;
+
 // Minutes setup
-int startMinutePos = 0;
+// Assume hands are in middle of machine on startup.
+int startMinutePos = stepsPerClockMinuteHand / 2;
 int currentMinutePos = startMinutePos;
 
 // Hours setup
-int startHourPos = 0;
+int startHourPos = stepsPerClockHourHand / 2;
 int currentHourPos = startHourPos;
 
 // These are the actual time, in seconds minutes and hours.  
@@ -68,20 +79,12 @@ int currentSeconds = 0;
 int currentMinutes = 0;
 int currentHours = 0;
 
-/* This is the number of steps to move the indicator from one end to the other. */
-static int stepsPerClockMinute = 2105;
-static int stepsPerClockHour = 2105;
-
-float stepsPerMinute = stepsPerClockMinute/60.0;
-float stepsPerHourMinute = stepsPerClockHour/720.0;
-float stepsPerHour = stepsPerClockHour/12.0;
-
-int const END_MARGIN = 4;
 
 /* User interface */
 long lastDebugMessageTime = 0L;
 
 /* Limits and interrupts */
+boolean useLimitSwitches = false;
 volatile boolean mLimitTriggered = false;
 volatile boolean hLimitTriggered = false;
 
@@ -139,14 +142,22 @@ void setup()
   
   // setup RTC stuff
   Wire.begin();
-  rtc.begin();
+  boolean rtcBegun = rtc.begin();
 
-  if (! rtc.isrunning()) {
-    Serial.println("RTC is NOT running!");
+  if (rtcBegun) {
+    Serial.println("RTC is started");
+  } else {
+    Serial.println("RTC couldn't be found!");
+    while (1); 
+  }
+
+  if (rtc.lostPower()) {
+    Serial.println("RTC lost power, lets set the default time.");
     // following line sets the RTC to the date & time this sketch was compiled
     rtc.adjust(DateTime(__DATE__, __TIME__));
   } else {
-    Serial.println("RTC is running.");
+    Serial.print("Picked up time from RTC: ");
+    reportPosition();
   }
 
   minuteHand.setMaxSpeed(maxSpeed);
@@ -155,23 +166,25 @@ void setup()
   hourHand.setAcceleration(acceleration);
   
   recalculateStepsPerUnits();
-  homeHands();
+  if (useLimitSwitches) {
+    homeHands();
+  }
 }
 
 void recalculateStepsPerUnits() {
-  stepsPerMinute = stepsPerClockMinute/60.0;
-  stepsPerHourMinute = stepsPerClockHour/720.0;
-  stepsPerHour = stepsPerClockHour/12.0;
+  stepsPerMinute = stepsPerClockMinuteHand/60.0;
+  stepsPerHourMinute = stepsPerClockHourHand/(60.0 * 12.0);
+  stepsPerHour = stepsPerClockHourHand/12.0;
 }
-
-
 
 void loop() 
 {
   findTimeToDisplay();
   setHandPositions();
   moveHands();
-  dealWithLimits();
+  if (useLimitSwitches) {
+    dealWithLimits();
+  }
   debug();
 }
 
@@ -185,8 +198,8 @@ void dealWithLimits()
     }
     else if (mDir == FORWARD) {
       // recalibrate length of machine
-      stepsPerClockMinute = minuteHand.currentPosition()-END_MARGIN;
-      stepsPerClockMinute = stepsPerClockMinute / stepSize;
+      stepsPerClockMinuteHand = minuteHand.currentPosition()-END_MARGIN;
+      stepsPerClockMinuteHand = stepsPerClockMinuteHand / stepSize;
       recalculateStepsPerUnits();
       minuteHand.moveTo(minuteHand.currentPosition());
       minuteHand.disableOutputs();
@@ -202,8 +215,8 @@ void dealWithLimits()
     }
     else if (hDir == FORWARD) {
       // recalibrate length of machine
-      stepsPerClockHour = hourHand.currentPosition()-END_MARGIN;
-      stepsPerClockHour = stepsPerClockHour / stepSize;
+      stepsPerClockHourHand = hourHand.currentPosition()-END_MARGIN;
+      stepsPerClockHourHand = stepsPerClockHourHand / stepSize;
       recalculateStepsPerUnits();
       hourHand.moveTo(hourHand.currentPosition());
       hourHand.disableOutputs();
@@ -275,6 +288,7 @@ void clearEndStops(int &limitPin, AccelStepper &hand)
   
   hand.disableOutputs();
 }
+
 void homeHands()
 {
   // check to see if any sensors are already triggered and move the carriage if it is
@@ -392,7 +406,7 @@ void homeHands()
 
       minuteHand.move(-(END_MARGIN*stepSize));
       while (minuteHand.distanceToGo() != 0) minuteHand.run();
-      stepsPerClockMinute = minuteHand.currentPosition();
+      stepsPerClockMinuteHand = minuteHand.currentPosition();
       recalculateStepsPerUnits();
       mLimitTriggered = false;
       Serial.println("Minute size detection finished.");
@@ -420,7 +434,7 @@ void homeHands()
 
       hourHand.move(-(END_MARGIN*stepSize));
       while (hourHand.distanceToGo() != 0) hourHand.run();
-      stepsPerClockHour = hourHand.currentPosition();
+      stepsPerClockHourHand = hourHand.currentPosition();
       recalculateStepsPerUnits();
       hLimitTriggered = false;
       Serial.println("Hour size detection finished.");
@@ -444,10 +458,10 @@ void homeHands()
 
   Serial.println("HOMED!!");
   Serial.print("Minute axis is ");
-  Serial.print(stepsPerClockMinute);
+  Serial.print(stepsPerClockMinuteHand);
   Serial.println(" true steps long.");
   Serial.print("Houre axis is ");
-  Serial.print(stepsPerClockHour);
+  Serial.print(stepsPerClockHourHand);
   Serial.println(" true steps long.");
 }
 
@@ -521,18 +535,7 @@ void findTimeToDisplay()
 {
   DateTime now = rtc.now();
   if (debugToSerial) {
-    Serial.print(now.year(), DEC);
-    Serial.print('/');
-    Serial.print(now.month(), DEC);
-    Serial.print('/');
-    Serial.print(now.day(), DEC);
-    Serial.print(' ');
-    Serial.print(now.hour(), DEC);
-    Serial.print(':');
-    Serial.print(now.minute(), DEC);
-    Serial.print(':');
-    Serial.print(now.second(), DEC);
-    Serial.println();
+    serialPrintTime(now);
   }
 
   currentHours = now.hour();
@@ -540,6 +543,21 @@ void findTimeToDisplay()
     currentHours = currentHours - 12;
   currentMinutes = now.minute();
   currentSeconds = now.second();
+}
+
+void serialPrintTime(DateTime t) {
+  Serial.print(t.year(), DEC);
+  Serial.print('/');
+  Serial.print(t.month(), DEC);
+  Serial.print('/');
+  Serial.print(t.day(), DEC);
+  Serial.print(' ');
+  Serial.print(t.hour(), DEC);
+  Serial.print(':');
+  Serial.print(t.minute(), DEC);
+  Serial.print(':');
+  Serial.print(t.second(), DEC);
+  Serial.println();
 }
 
 void setHandPositions()
