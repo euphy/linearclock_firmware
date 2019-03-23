@@ -3,9 +3,14 @@
 #include "RTClib.h"
 #include <Button.h>
 
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <WebServer.h>
+#include <ESPmDNS.h>
+
 /*
 Linear Clock driver
-Written by Sandy Noble (sandy.noble@gmail.com)
+Copyright Sandy Noble (sandy.noble@gmail.com) 2019
 This version 23rd March 2019
 
 Uses DS3231 Real time clock module wired:
@@ -19,9 +24,6 @@ cheap motors (28BYJ-48) and drivers.
 
 Home switches are on pins D2 and D3, they are the AVR interrupts 0 and 1.  They are
 electrically wired to switches at both ends of each rail.  
-
-
-This should be fairly simple self-explanatory code.
 
 @TODO  Reserve pins for LDR and lighting controller (PWM).
 @TODO  Write clock size into EEPROM when it changes so it doesn't have to recalibrate every time it resets.
@@ -105,6 +107,12 @@ static boolean hourWinding = true;
 boolean debugToSerial = true;
 
 
+/* HTTP server setup */
+boolean httpServerInitialised = false;
+const char *ssid = "linearclock";
+WebServer server(80);
+
+
 void mLimitISR()
 {
   static unsigned long lastInterrupt = 0;
@@ -156,10 +164,12 @@ void setup()
     // following line sets the RTC to the date & time this sketch was compiled
     rtc.adjust(DateTime(__DATE__, __TIME__));
   } else {
-    Serial.print("Picked up time from RTC: ");
+    Serial.println("Picked up time from RTC: ");
+    findTimeToDisplay();
     reportPosition();
   }
 
+  // Set up motors and steps
   minuteHand.setMaxSpeed(maxSpeed);
   minuteHand.setAcceleration(acceleration);
   hourHand.setMaxSpeed(maxSpeed);
@@ -168,6 +178,11 @@ void setup()
   recalculateStepsPerUnits();
   if (useLimitSwitches) {
     homeHands();
+  }
+  else {
+    minuteHand.setCurrentPosition(startMinutePos);
+    hourHand.setCurrentPosition(startHourPos);
+    reportPosition();    
   }
 }
 
@@ -490,14 +505,14 @@ void moveHands()
     if (hLimitTriggered)
       Serial.println("hlimit triggered.");
     else {
-      if (debugToSerial) Serial.println("running hour!");
+      if (debugToSerial) Serial.println("running hour hand!");
       hourHand.run();
     }
       
     if (mLimitTriggered)
       Serial.println("mlimit triggered.");
     else {
-      if (debugToSerial) Serial.println("running hour!");
+      if (debugToSerial) Serial.println("running minute hand!");
       minuteHand.run();
     }
     if (hourHand.distanceToGo() < stepSize || minuteHand.distanceToGo() < stepSize) {
@@ -509,8 +524,8 @@ void moveHands()
   else
   {
     if (debugToSerial) {
-      Serial.print("After moving: ");
-      reportPosition();
+      Serial.println("After moving: ");
+//      reportPosition();
     }
   }
 }
