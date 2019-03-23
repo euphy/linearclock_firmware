@@ -6,14 +6,16 @@
 /*
 Linear Clock driver
 Written by Sandy Noble (sandy.noble@gmail.com)
-This version 27th August 2013
+This version 23rd March 2019
 
-Uses DS1307 Real time clock module wired:
-Arduino pin A4 to DS1307 SDA pin.
-Arduino pin A5 to DS1307 SCL pin.
+Uses DS3231 Real time clock module wired:
+ESP32 pin 21 to DS3231 SDA pin.
+ESP32 pin 22 to DS3231 SCL pin.
 
-Uses 2x L293D H bridge drivers wired to arduino pins 4, 5, 6 & 7 driving minute hand motor,
-and pins 8, 9, 10 & 11 driving hour hand motor.  This is an extremely simple circuit.
+Uses 2x ULN2003 amps drivers wired to arduino pins 15, 2, 0 & 1 driving minute hand motor,
+and pins 34, 35, 32 & 33 driving hour hand motor.  
+This is an extremely simple circuit intended to use the most commonly available 
+cheap motors (28BYJ-48) and drivers.
 
 Home switches are on pins D2 and D3, they are the AVR interrupts 0 and 1.  They are
 electrically wired to switches at both ends of each rail.  
@@ -77,7 +79,6 @@ float stepsPerHour = stepsPerClockHour/12.0;
 int const END_MARGIN = 4;
 
 /* User interface */
-
 long lastDebugMessageTime = 0L;
 
 /* Limits and interrupts */
@@ -132,15 +133,6 @@ void setup()
 //  attachInterrupt(digitalPinToInterrupt(hInt), hLimitISR, FALLING);
   pinMode(hInt, INPUT_PULLUP);
   digitalWrite(hourLimitPin, HIGH);
-
-//  pinMode(motoraEnablePin, OUTPUT);
-//  digitalWrite(motoraEnablePin, HIGH);
-//  pinMode(motorbEnablePin, OUTPUT);
-//  digitalWrite(motorbEnablePin, HIGH);
-//  minuteHand.setEnablePin(motoraEnablePin);
-//  minuteHand.setPinsInverted(false, false, true);
-//  hourHand.setEnablePin(motorbEnablePin);
-//  hourHand.setPinsInverted(true, false, true); // this one turns the opposite direction to A, hence inverted.
 
   minuteHand.setMaxSpeed(maxSpeed);
   hourHand.setMaxSpeed(maxSpeed);
