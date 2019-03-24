@@ -41,7 +41,7 @@ void http_handleClient() {
 
 
 void http_handleRoot() {
-  char temp[400];
+  char temp[600];
   DateTime now = rtc.now();
   
   int sec = now.second();
@@ -52,7 +52,7 @@ void http_handleRoot() {
   int month = now.month();
   int year = now.year();
 
-  snprintf(temp, 400,
+  snprintf(temp, 600,
 
            "<html>\
   <head>\
