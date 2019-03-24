@@ -1,13 +1,3 @@
-#include <AccelStepper.h>
-#include <Wire.h>
-#include "RTClib.h"
-#include <Button.h>
-
-#include <WiFi.h>
-#include <WiFiClient.h>
-#include <WebServer.h>
-#include <ESPmDNS.h>
-
 /*
 Linear Clock driver
 Copyright Sandy Noble (sandy.noble@gmail.com) 2019
@@ -32,9 +22,23 @@ electrically wired to switches at both ends of each rail.
 
 */
 
-/* Clock setup */
-RTC_DS3231 rtc;
+// Includes...
+// For motor control
+#include <AccelStepper.h>
 
+// For i2s realtime clock
+#include <Wire.h> 
+#include "RTClib.h"
+
+// For wifi web server to set time
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <WebServer.h>
+#include <ESPmDNS.h>
+
+
+// Clock setup. Doesn't mention pins because uses default 21/22 on ESP32.
+RTC_DS3231 rtc;
 
 // These set up the motors.  The values here depend on how they've been wired up.
 const byte motoraPin1 = 15;
@@ -50,8 +54,8 @@ const byte motorbPin4 = 33;
 AccelStepper minuteHand(AccelStepper::FULL4WIRE, motoraPin1, motoraPin2, motoraPin3, motoraPin4); // minutes
 AccelStepper hourHand(AccelStepper::FULL4WIRE, motorbPin1, motorbPin2, motorbPin3, motorbPin4); // hours
 
-float maxSpeed = 2000.0;
-float acceleration = 1000.0;
+float maxSpeed = 10000.0;
+float acceleration = 5000.0;
 byte stepSize = 1;
 
 boolean motorsEnabled = false;
@@ -66,8 +70,8 @@ float stepsPerHour = stepsPerClockHourHand/12.0;
 
 int const END_MARGIN = 4;
 
-// Minutes setup
 // Assume hands are in middle of machine on startup.
+// Minutes setup
 int startMinutePos = stepsPerClockMinuteHand / 2;
 int currentMinutePos = startMinutePos;
 
