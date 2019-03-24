@@ -11,36 +11,135 @@ you'll set the time if the RTC loses it.
 
 void http_initServer() {
   httpServerInitialised = false;
-  WiFi.mode(WIFI_AP);           //Only Access point
-  WiFi.softAP(ssid);  //Start HOTspot removing password will disable security
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(ssid); // add a password here to secure the AP
  
-  IPAddress myIP = WiFi.softAPIP(); //Get IP address
   Serial.print("Linear clock IP address: ");
-  Serial.println(myIP);
- 
-  server.on("/", http_handleRoot);      //Which routine to handle at root location
- 
-  server.begin();                  //Start server
+  Serial.println(WiFi.softAPIP());
+
+  
+  server.begin();
   Serial.println("HTTP server started");
 
-  server.on("/", http_handleRoot);
-  server.on("/test.svg", http_drawGraph);
-  server.on("/inline", []() {
-    server.send(200, "text/plain", "this works as well");
-  });
+  // Set up routes
+  server.on("/", HTTP_GET, http_handleRoot);
+  server.on("/update", HTTP_GET, http_handleTimeChangePage);
+  server.on("/update", HTTP_POST, http_handleTimeChangeSubmit);
   server.onNotFound(http_handleNotFound);
   httpServerInitialised = true;
 
 }
 
-void http_handleClient() {
-  if (httpServerInitialised) {
-    server.handleClient();
+
+void http_handleTimeChangeSubmit(AsyncWebServerRequest *request) {
+
+  const char* DATE_TIME_INPUT_FIELD = "dateTimeInput";
+
+  // format is dddd-mm-ddThh:mm
+  //           0123456789012345 - 16 chars
+
+  //List all parameters
+  int params = request->params();
+  for (int i=0; i<params; i++) {
+    AsyncWebParameter* p = request->getParam(i);
+    Serial.print("\nParam name: '");
+    Serial.print(p->name());
+    Serial.print("'\tValue: '");
+    Serial.print(p->value());
+    Serial.println("'.");
+
   }
+
+
+  if (request->hasParam(DATE_TIME_INPUT_FIELD, true)) {
+    Serial.println("Datetime has been submitted: ");
+    AsyncWebParameter* p = request->getParam(0);
+    String param = p->value().c_str();
+    if (param.length() == 16) {
+      Serial.println("Size is right.");
+      long year = param.substring(0, 4).toInt();
+      long month = param.substring(5, 7).toInt();
+      long day = param.substring(8, 10).toInt();
+      long hour = param.substring(11, 13).toInt();
+      long minute = param.substring(14, 16).toInt();
+
+      Serial.print(year);
+      Serial.print("...");
+      Serial.print(month);
+      Serial.print("...");
+      Serial.print(day);
+      Serial.print("...");
+      Serial.print(hour);
+      Serial.print("...");
+      Serial.print(minute);
+      Serial.println("...");
+
+      DateTime dt = DateTime(year, month, day, hour, minute, 0);
+      serialPrintTime(dt);
+
+      Serial.println("Before:");
+      serialPrintTime(rtc.now());
+      rtc.adjust(dt);
+
+      Serial.println("After:");
+      serialPrintTime(rtc.now());
+      
+    }
+  }
+  else {
+    Serial.print("No param found! ");
+    Serial.print("Was looking for '");
+    Serial.print(DATE_TIME_INPUT_FIELD);
+    Serial.println("'");
+  }
+  
+  String message = "Changing time to:\n\n";
+  message += "URL: ";
+  message += request->url();
+  message += "\nMethod: ";
+  message += request->method();
+  message += "\nArguments: ";
+  message += request->params();
+  message += "\n";
+
+  //List all parameters
+  for(int i=0;i<params;i++){
+    AsyncWebParameter* p = request->getParam(i);
+    message += "\nParam name: '";
+    message += p->name().c_str();
+    message += "'\tValue: '";
+    message += p->value().c_str();
+    message += "'";
+  }
+
+  request->redirect("/");  
 }
 
+void http_handleTimeChangePage(AsyncWebServerRequest *request) {
 
-void http_handleRoot() {
+  String page = "<html>\
+  <head>\
+    <title>Realtime clock output</title>\
+    <style>\
+      body { font-size: 4em;}\
+    </style>\
+  </head>\
+  <body>\
+    <h1>Set the time</h1>\
+    <form method=\"post\">\
+      <label for=\"dateTimeInput\">Date and time</label>\
+      <input type=\"datetime-local\" id=\"dateTimeInput\" name=\"dateTimeInput\" />\
+      <input type=\"submit\" value=\"submit\" />\
+    </form>\
+  </body>\
+</html>";
+
+  request->send(200, "text/html", page);
+
+}
+
+void http_handleRoot(AsyncWebServerRequest *request) {
+ 
   char temp[600];
   DateTime now = rtc.now();
   
@@ -66,54 +165,36 @@ void http_handleRoot() {
     <h1>Real time clock says:</h1>\
     <p>%02d:%02d:%02d</p>\
     <p>%02d/%02d/%04d</p>\
-    <img src=\"/test.svg\" />\
-    <form method=\"post\">\
-      <input type=\"datetime-local\" name=\"dateTimeInput\" />\
-      <input type=\"submit\" value=\"submit\" />\
-    </form>\
+    <a href=\"update\">Change the time</a>\
   </body>\
 </html>",
 
            hour, min, sec, day, month, year
           );
-  server.send(200, "text/html", temp);
+  request->send(200, "text/html", temp);
   
 }
 
-void http_handleNotFound() {
+void http_handleNotFound(AsyncWebServerRequest *request) {
   String message = "File Not Found\n\n";
-  message += "URI: ";
-  message += server.uri();
+  message += "URL: ";
+  message += request->url();
   message += "\nMethod: ";
-  message += (server.method() == HTTP_GET) ? "GET" : "POST";
+  message += request->method();
   message += "\nArguments: ";
-  message += server.args();
+  message += request->params();
   message += "\n";
 
-  for (uint8_t i = 0; i < server.args(); i++) {
-    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+  //List all parameters
+  int params = request->params();
+  for(int i=0;i<params;i++){
+    AsyncWebParameter* p = request->getParam(i);
+    message += "\nParam name: ";
+    message += p->name().c_str();
+    message += "\tValue: ";
+    message += p->value().c_str();
   }
 
-  server.send(404, "text/plain", message);
+  request->send(404, "text/plain", message);
 
-}
-
-
-void http_drawGraph() {
-  
-  String out = "";
-  char temp[100];
-  out += "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" width=\"400\" height=\"150\">\n";
-  out += "<rect width=\"400\" height=\"150\" fill=\"rgb(250, 230, 210)\" stroke-width=\"1\" stroke=\"rgb(0, 0, 0)\" />\n";
-  out += "<g stroke=\"black\">\n";
-  int y = rand() % 130;
-  for (int x = 10; x < 390; x += 10) {
-    int y2 = rand() % 130;
-    sprintf(temp, "<line x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke-width=\"1\" />\n", x, 140 - y, x + 10, 140 - y2);
-    out += temp;
-    y = y2;
-  }
-  out += "</g>\n</svg>\n";
-
-  server.send(200, "image/svg+xml", out);
 }

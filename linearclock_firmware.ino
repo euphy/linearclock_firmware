@@ -1,3 +1,4 @@
+
 /*
 Linear Clock driver
 Copyright Sandy Noble (sandy.noble@gmail.com) 2019
@@ -32,9 +33,8 @@ electrically wired to switches at both ends of each rail.
 
 // For wifi web server to set time
 #include <WiFi.h>
-#include <WiFiClient.h>
-#include <WebServer.h>
-#include <ESPmDNS.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
 
 
 // Clock setup. Doesn't mention pins because uses default 21/22 on ESP32.
@@ -114,7 +114,7 @@ boolean debugToSerial = true;
 /* HTTP server setup */
 boolean httpServerInitialised = false;
 const char *ssid = "linearclock";
-WebServer server(80);
+AsyncWebServer server(80);
 
 
 void mLimitISR()
@@ -207,7 +207,6 @@ void loop()
     dealWithLimits();
   }
 //  debug();
-  http_handleClient();
 }
 
 void dealWithLimits()
