@@ -23,6 +23,7 @@ electrically wired to switches at both ends of each rail.
 */
 
 // Includes...
+#include <Arduino.h>
 // For motor control
 #include <AccelStepper.h>
 
@@ -35,6 +36,9 @@ electrically wired to switches at both ends of each rail.
 #include <WiFiClient.h>
 #include <WebServer.h>
 #include <ESPmDNS.h>
+
+// other project files
+#include "http_server.h"
 
 
 // Clock setup. Doesn't mention pins because uses default 21/22 on ESP32.
