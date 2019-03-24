@@ -29,9 +29,8 @@ void http_initServer() {
     server.send(200, "text/plain", "this works as well");
   });
   server.onNotFound(http_handleNotFound);
-  server.begin();
-  Serial.println("HTTP server started");
   httpServerInitialised = true;
+
 }
 
 void http_handleClient() {
@@ -60,7 +59,7 @@ void http_handleRoot() {
     <meta http-equiv='refresh' content='5'/>\
     <title>Realtime clock output</title>\
     <style>\
-      body { background-color: #cccccc; font-family: Arial, Helvetica, Sans-Serif; Color: #000088; font-size: 4em;}\
+      body { font-size: 4em;}\
     </style>\
   </head>\
   <body>\
@@ -68,6 +67,10 @@ void http_handleRoot() {
     <p>%02d:%02d:%02d</p>\
     <p>%02d/%02d/%04d</p>\
     <img src=\"/test.svg\" />\
+    <form method=\"post\">\
+      <input type=\"datetime-local\" name=\"dateTimeInput\" />\
+      <input type=\"submit\" value=\"submit\" />\
+    </form>\
   </body>\
 </html>",
 

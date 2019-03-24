@@ -184,6 +184,8 @@ void setup()
     hourHand.setCurrentPosition(startHourPos);
     reportPosition();    
   }
+
+  http_initServer();
 }
 
 void recalculateStepsPerUnits() {
@@ -196,11 +198,12 @@ void loop()
 {
   findTimeToDisplay();
   setHandPositions();
-  moveHands();
+//  moveHands();
   if (useLimitSwitches) {
     dealWithLimits();
   }
-  debug();
+//  debug();
+  http_handleClient();
 }
 
 void dealWithLimits()
@@ -525,7 +528,7 @@ void moveHands()
   {
     if (debugToSerial) {
       Serial.println("After moving: ");
-//      reportPosition();
+      reportPosition();
     }
   }
 }
@@ -550,7 +553,7 @@ void findTimeToDisplay()
 {
   DateTime now = rtc.now();
   if (debugToSerial) {
-    serialPrintTime(now);
+//    serialPrintTime(now);
   }
 
   currentHours = now.hour();
