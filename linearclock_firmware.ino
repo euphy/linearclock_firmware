@@ -105,7 +105,7 @@ static byte hDir = BACKWARD;
 static boolean minuteWinding = true;
 static boolean hourWinding = true;
 
-boolean debugToSerial = true;
+boolean debugToSerial = false;
 
 
 /* HTTP server setup */
@@ -134,7 +134,7 @@ void hLimitISR()
 
 void setup() 
 {
-  Serial.begin(9600);
+  Serial.begin(115200);
   Serial.println("LINEAR CLOCK.");
 
   // attach limit interrupts
@@ -148,11 +148,9 @@ void setup()
 
   minuteHand.setEnablePin(MOTOR_A_ENABLE_PIN);
   minuteHand.setPinsInverted(false, false, true);
-  minuteHand.enableOutputs();
 
   hourHand.setEnablePin(MOTOR_B_ENABLE_PIN);
   hourHand.setPinsInverted(false, false, true);
-  hourHand.enableOutputs();
   
   // setup RTC stuff
   Wire.begin();
@@ -208,7 +206,7 @@ void loop()
   if (useLimitSwitches) {
     dealWithLimits();
   }
-//  debug();
+  debug();
 }
 
 void dealWithLimits()
@@ -495,6 +493,7 @@ void moveHands()
     if (!motorsEnabled) {
       hourHand.enableOutputs();
       minuteHand.enableOutputs();
+      motorsEnabled = true;
     }
 
     if (debugToSerial) {
@@ -523,14 +522,13 @@ void moveHands()
       if (debugToSerial) Serial.println("running minute hand!");
       minuteHand.run();
     }
-    if (hourHand.distanceToGo() < stepSize || minuteHand.distanceToGo() < stepSize) {
-      hourHand.disableOutputs();
-      minuteHand.disableOutputs();
-    }
     
   }
   else
   {
+    hourHand.disableOutputs();
+    minuteHand.disableOutputs();
+    motorsEnabled = false;
     if (debugToSerial) {
       Serial.println("After moving: ");
       reportPosition();
@@ -539,7 +537,7 @@ void moveHands()
 }
 
 
-String reportPosition()
+void reportPosition()
 {
   Serial.print("Position: ");
   Serial.print(hourHand.currentPosition());
