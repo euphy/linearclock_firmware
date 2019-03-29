@@ -1,4 +1,3 @@
-
 /*
 Linear Clock driver
 Copyright Sandy Noble (sandy.noble@gmail.com) 2019
@@ -41,21 +40,19 @@ electrically wired to switches at both ends of each rail.
 RTC_DS3231 rtc;
 
 // These set up the motors.  The values here depend on how they've been wired up.
-const byte motoraPin1 = 15;
-const byte motoraPin2 = 2;
-const byte motoraPin3 = 0;
-const byte motoraPin4 = 4;
+#define MOTOR_A_ENABLE_PIN 27
+#define MOTOR_A_STEP_PIN 14
+#define MOTOR_A_DIR_PIN 12
 
-const byte motorbPin1 = 34;
-const byte motorbPin2 = 35;
-const byte motorbPin3 = 32;
-const byte motorbPin4 = 33;
+#define MOTOR_B_ENABLE_PIN 13
+#define MOTOR_B_STEP_PIN 4
+#define MOTOR_B_DIR_PIN 15
 
-AccelStepper minuteHand(AccelStepper::FULL4WIRE, motoraPin1, motoraPin2, motoraPin3, motoraPin4); // minutes
-AccelStepper hourHand(AccelStepper::FULL4WIRE, motorbPin1, motorbPin2, motorbPin3, motorbPin4); // hours
+AccelStepper minuteHand(AccelStepper::DRIVER, MOTOR_A_STEP_PIN, MOTOR_A_DIR_PIN);
+AccelStepper hourHand(AccelStepper::DRIVER, MOTOR_B_STEP_PIN, MOTOR_B_DIR_PIN);
 
-float maxSpeed = 10000.0;
-float acceleration = 5000.0;
+float maxSpeed = 1000.0;
+float acceleration = 1000.0;
 byte stepSize = 1;
 
 boolean motorsEnabled = false;
@@ -149,8 +146,13 @@ void setup()
   pinMode(hInt, INPUT_PULLUP);
   digitalWrite(hourLimitPin, HIGH);
 
-  minuteHand.setMaxSpeed(maxSpeed);
-  hourHand.setMaxSpeed(maxSpeed);
+  minuteHand.setEnablePin(MOTOR_A_ENABLE_PIN);
+  minuteHand.setPinsInverted(false, false, true);
+  minuteHand.enableOutputs();
+
+  hourHand.setEnablePin(MOTOR_B_ENABLE_PIN);
+  hourHand.setPinsInverted(false, false, true);
+  hourHand.enableOutputs();
   
   // setup RTC stuff
   Wire.begin();
@@ -202,7 +204,7 @@ void loop()
 {
   findTimeToDisplay();
   setHandPositions();
-//  moveHands();
+  moveHands();
   if (useLimitSwitches) {
     dealWithLimits();
   }
