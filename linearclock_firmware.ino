@@ -58,8 +58,8 @@ byte stepSize = 8;
 boolean motorsEnabled = false;
 
 /* This is the number of steps to move the indicator from one end to the other. */
-static int stepsPerClockMinuteHand = 2105*stepSize;
-static int stepsPerClockHourHand = 2105*stepSize;
+static int stepsPerClockMinuteHand = 2105;
+static int stepsPerClockHourHand = 2105;
 
 float stepsPerMinute = stepsPerClockMinuteHand/60.0;
 float stepsPerHourMinute = stepsPerClockHourHand/(60.0 * 12.0);
@@ -82,29 +82,30 @@ int currentSeconds = 0;
 int currentMinutes = 0;
 int currentHours = 0;
 
+int checkedTimeCount = 0;
 
 /* User interface */
 long lastDebugMessageTime = 0L;
 
 /* Limits and interrupts */
-boolean useLimitSwitches = false;
+boolean machineHasLimitSwitches = true;
+boolean machineHasHardLimits = true;
+
 volatile boolean mLimitTriggered = false;
 volatile boolean hLimitTriggered = false;
 
 int minuteLimitPin = 16;
 int hourLimitPin = 17;
 
-const byte BACKWARD = 0;
-const byte FORWARD = 1;
+enum direction {BACKWARD, FORWARD};
 
-static byte mDir = BACKWARD;
-static byte hDir = BACKWARD;
+direction mDir = BACKWARD;
+direction hDir = BACKWARD;
 
 static boolean minuteWinding = true;
 static boolean hourWinding = true;
 
 boolean debugToSerial = false;
-
 
 /* HTTP server setup */
 boolean httpServerInitialised = false;
@@ -137,13 +138,18 @@ void setup()
   Serial.begin(115200);
   Serial.println("LINEAR CLOCK.");
 
-  // attach limit interrupts
-  pinMode(minuteLimitPin, INPUT_PULLUP);
-  attachInterrupt(minuteLimitPin, mLimitISR, FALLING);
-
-  pinMode(hourLimitPin, INPUT_PULLUP);
-  attachInterrupt(hourLimitPin, hLimitISR, FALLING);
-
+  if (machineHasLimitSwitches) {
+    // attach limit interrupts
+    pinMode(minuteLimitPin, INPUT_PULLUP);
+    attachInterrupt(minuteLimitPin, mLimitISR, FALLING);
+  
+    pinMode(hourLimitPin, INPUT_PULLUP);
+    attachInterrupt(hourLimitPin, hLimitISR, FALLING);
+  }
+  else {
+    Serial.println("No limit switches on this machine.");
+  }
+  
   minuteHand.setEnablePin(MOTOR_A_ENABLE_PIN);
   minuteHand.setPinsInverted(false, false, true);
 
@@ -178,10 +184,11 @@ void setup()
   hourHand.setAcceleration(acceleration);
   
   recalculateStepsPerUnits();
-  if (useLimitSwitches) {
+  if (machineHasHardLimits) {
     homeHands();
   }
   else {
+    Serial.println("Machine has no hard limits, so setting start position to defaults");
     minuteHand.setCurrentPosition(startMinutePos);
     hourHand.setCurrentPosition(startHourPos);
     reportPosition();    
@@ -288,16 +295,29 @@ void reportPosition()
 
 void findTimeToDisplay()
 {
+  checkedTimeCount++;
   DateTime now = rtc.now();
   if (debugToSerial) {
     serialPrintTime(now);
   }
+
+  int normalisedHours = (now.hour() >= 12) ? now.hour() - 12 : now.hour();
+  if (normalisedHours != currentHours || now.minute() != currentMinutes) {
+    Serial.print("findTimeToDisplay ran ");
+    Serial.print(checkedTimeCount);
+    Serial.println(" times before needing to change current time.");
+    checkedTimeCount = 0;
+  }
+
 
   currentHours = now.hour();
   if (currentHours >= 12)
     currentHours = currentHours - 12;
   currentMinutes = now.minute();
   currentSeconds = now.second();
+
+  
+  
 }
 
 void serialPrintTime(DateTime t) {
@@ -338,8 +358,15 @@ void displayHour(long hour, long minute)
   {
     Serial.print("Moving hour hand to ");
     Serial.print(currentHourPos);
-    Serial.print(", to represent ");
-    Serial.println(hour);
+    Serial.print(" (hr pos: ");
+    Serial.print(justHours);
+    Serial.print(" + min pos: ");
+    Serial.print(justMinutes);
+    Serial.print("), to represent ");
+    Serial.print(hour);
+    Serial.print(" hours and ");
+    Serial.print(minute);
+    Serial.println(" minutes.");
     hourHand.moveTo(currentHourPos*stepSize);
   }
 }
@@ -356,7 +383,8 @@ void displayMinute(long minute)
     Serial.print("Moving minute hand to position ");
     Serial.print(currentMinutePos);
     Serial.print(", to represent ");
-    Serial.println(minute);
+    Serial.print(minute);
+    Serial.println(" minutes.");
     
     minuteHand.moveTo(currentMinutePos*stepSize);
   }

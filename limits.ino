@@ -232,32 +232,43 @@ void clearEndStops(int &limitPin, AccelStepper &hand)
 
 void dealWithLimits()
 {
-  dealWithMinuteLimit();
-  dealWithHourLimit();
+  if (machineHasLimitSwitches) {
+    dealWithMinuteLimit();
+    dealWithHourLimit();
+  }
 }
 
 void dealWithMinuteLimit() {
   if (mLimitTriggered) {
     if (digitalRead(minuteLimitPin)) {
       Serial.println("Minute pin gone from low to high (switch opened)");
+      mLimitTriggered = false;
+      return;
     }
     else {
       Serial.println("Minute pin gone from high to low (switch closed)");
     }
-    
-//    if (mDir == BACKWARD) {
-//      minuteHand.setCurrentPosition(0);
-//      minuteHand.moveTo(0);
-//      minuteHand.disableOutputs();
-//    }
-//    else if (mDir == FORWARD) {
-//      // recalibrate length of machine
-//      stepsPerClockMinuteHand = minuteHand.currentPosition()-END_MARGIN;
-//      stepsPerClockMinuteHand = stepsPerClockMinuteHand / stepSize;
-//      recalculateStepsPerUnits();
-//      minuteHand.moveTo(minuteHand.currentPosition());
-//      minuteHand.disableOutputs();
-//    }
+
+    if (machineHasHardLimits) {
+      Serial.println("Hard minute hand limit switch closed.");
+      if (mDir == BACKWARD) {
+        Serial.println("Minute hand was going backwards at the time, so set current position to be early end of the machine (0).");
+        minuteHand.setCurrentPosition(0);
+        minuteHand.moveTo(0);
+        minuteHand.disableOutputs();
+      }
+      else if (mDir == FORWARD) {
+        // recalibrate length of machine
+        Serial.print("Minute hand was going forwards at the time, so consider this position to be the late end of the machine, and recalibrate the steps-per-clock based on this (");
+        Serial.print(minuteHand.currentPosition());
+        Serial.println(").");
+        stepsPerClockMinuteHand = minuteHand.currentPosition()-END_MARGIN;
+        stepsPerClockMinuteHand = stepsPerClockMinuteHand / stepSize;
+        recalculateStepsPerUnits();
+        minuteHand.moveTo(minuteHand.currentPosition());
+        minuteHand.disableOutputs();
+      }
+    }
     
     mLimitTriggered = false;
   }
@@ -265,26 +276,35 @@ void dealWithMinuteLimit() {
 
 void dealWithHourLimit() {
   if (hLimitTriggered) {
-    if (digitalRead(minuteLimitPin)) {
-      Serial.println("Minute pin gone from low to high (switch opened)");
+    if (digitalRead(hourLimitPin)) {
+      Serial.println("Hour pin gone from low to high (switch opened)");
+      hLimitTriggered = false;
+      return;
     }
     else {
-      Serial.println("Minute pin gone from high to low (switch closed)");
+      Serial.println("Hour pin gone from high to low (switch closed)");
     }
 
-//    if (hDir == BACKWARD) {
-//      hourHand.setCurrentPosition(0);
-//      hourHand.moveTo(0);
-//      hourHand.disableOutputs();
-//    }
-//    else if (hDir == FORWARD) {
-//      // recalibrate length of machine
-//      stepsPerClockHourHand = hourHand.currentPosition()-END_MARGIN;
-//      stepsPerClockHourHand = stepsPerClockHourHand / stepSize;
-//      recalculateStepsPerUnits();
-//      hourHand.moveTo(hourHand.currentPosition());
-//      hourHand.disableOutputs();
-//    }
+    if (machineHasHardLimits) {
+      Serial.println("Hard hour hand limit switch closed.");
+      if (hDir == BACKWARD) {
+        Serial.println("Hour hand was going backwards at the time, so set current position to be early end of the machine (0).");
+        hourHand.setCurrentPosition(0);
+        hourHand.moveTo(0);
+        hourHand.disableOutputs();
+      }
+      else if (hDir == FORWARD) {
+        // recalibrate length of machine
+        Serial.print("Hour hand was going forwards at the time, so consider this position to be the late end of the machine, and recalibrate the steps-per-clock based on this (");
+        Serial.print(hourHand.currentPosition());
+        Serial.println(").");
+        stepsPerClockHourHand = hourHand.currentPosition()-END_MARGIN;
+        stepsPerClockHourHand = stepsPerClockHourHand / stepSize;
+        recalculateStepsPerUnits();
+        hourHand.moveTo(hourHand.currentPosition());
+        hourHand.disableOutputs();
+      }
+    }
     
     hLimitTriggered = false;
   }
