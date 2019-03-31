@@ -89,13 +89,17 @@ long lastDebugMessageTime = 0L;
 
 /* Limits and interrupts */
 boolean machineHasLimitSwitches = true;
-boolean machineHasHardLimits = true;
+boolean machineHasHardLimits = false;
 
-volatile boolean mLimitTriggered = false;
-volatile boolean hLimitTriggered = false;
+volatile boolean minuteStartLimitTriggered = false;
+volatile boolean minuteEndLimitTriggered = false;
+volatile boolean hourStartLimitTriggered = false;
+volatile boolean hourEndLimitTriggered = false;
 
-int minuteLimitPin = 16;
-int hourLimitPin = 17;
+int minuteStartLimitPin = 39;
+int minuteEndLimitPin = 16;
+int hourStartLimitPin = 35;
+int hourEndLimitPin = 17;
 
 enum direction {BACKWARD, FORWARD};
 
@@ -113,22 +117,42 @@ const char *ssid = "linearclock";
 AsyncWebServer server(80);
 
 
-void IRAM_ATTR mLimitISR()
+void IRAM_ATTR minuteStartLimitISR()
 {
   static unsigned long lastInterrupt = 0;
   unsigned long interruptTime = millis();
   if (interruptTime - lastInterrupt > 50) {
-    mLimitTriggered = true;
+    minuteStartLimitTriggered = true;
   }
   lastInterrupt = interruptTime;
 }
 
-void IRAM_ATTR hLimitISR()
+void IRAM_ATTR hourStartLimitISR()
 {
   static unsigned long lastInterrupt = 0;
   unsigned long interruptTime = millis();
   if (interruptTime - lastInterrupt > 50) {
-    hLimitTriggered = true;
+    hourStartLimitTriggered = true;
+  }
+  lastInterrupt = interruptTime;
+}
+
+void IRAM_ATTR minuteEndLimitISR()
+{
+  static unsigned long lastInterrupt = 0;
+  unsigned long interruptTime = millis();
+  if (interruptTime - lastInterrupt > 50) {
+    minuteEndLimitTriggered = true;
+  }
+  lastInterrupt = interruptTime;
+}
+
+void IRAM_ATTR hourEndLimitISR()
+{
+  static unsigned long lastInterrupt = 0;
+  unsigned long interruptTime = millis();
+  if (interruptTime - lastInterrupt > 50) {
+    hourEndLimitTriggered = true;
   }
   lastInterrupt = interruptTime;
 }
@@ -140,11 +164,17 @@ void setup()
 
   if (machineHasLimitSwitches) {
     // attach limit interrupts
-    pinMode(minuteLimitPin, INPUT_PULLUP);
-    attachInterrupt(minuteLimitPin, mLimitISR, FALLING);
+    pinMode(minuteStartLimitPin, INPUT_PULLUP);
+    attachInterrupt(minuteStartLimitPin, minuteStartLimitISR, FALLING);
   
-    pinMode(hourLimitPin, INPUT_PULLUP);
-    attachInterrupt(hourLimitPin, hLimitISR, FALLING);
+    pinMode(hourStartLimitPin, INPUT_PULLUP);
+    attachInterrupt(hourStartLimitPin, hourStartLimitISR, FALLING);
+
+    pinMode(minuteEndLimitPin, INPUT_PULLUP);
+    attachInterrupt(minuteEndLimitPin, minuteEndLimitISR, FALLING);
+  
+    pinMode(hourEndLimitPin, INPUT_PULLUP);
+    attachInterrupt(hourEndLimitPin, hourEndLimitISR, FALLING);
   }
   else {
     Serial.println("No limit switches on this machine.");
@@ -185,7 +215,8 @@ void setup()
   
   recalculateStepsPerUnits();
   if (machineHasHardLimits) {
-    homeHands();
+    detectMachineStartPosition();
+    detectMachineEndPosition();
   }
   else {
     Serial.println("Machine has no hard limits, so setting start position to defaults");
@@ -250,15 +281,15 @@ void moveHands()
     }
     
 
-    if (hLimitTriggered)
-      Serial.println("hlimit triggered.");
+    if (hourEndLimitTriggered)
+      Serial.println("hour end limit triggered.");
     else {
       if (debugToSerial) Serial.println("running hour hand!");
       hourHand.run();
     }
       
-    if (mLimitTriggered)
-      Serial.println("mlimit triggered.");
+    if (minuteEndLimitTriggered)
+      Serial.println("minute end limit triggered.");
     else {
       if (debugToSerial) Serial.println("running minute hand!");
       minuteHand.run();
@@ -388,4 +419,11 @@ void displayMinute(long minute)
     
     minuteHand.moveTo(currentMinutePos*stepSize);
   }
+}
+
+void panic(String message)
+{
+  Serial.print("PANIC! ");
+  Serial.println(message);
+  while (1);
 }
